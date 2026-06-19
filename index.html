@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paper Doll System</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- 左側：紙娃娃展示區 -->
+        <div class="avatar-panel">
+            <div class="avatar-container" id="avatar-container">
+                <!-- 圖層順序很重要，CSS 的 z-index 對應這裡的層級 -->
+                <img src="assets/boy/base.webp" class="layer" id="layer-base" alt="Base">
+                <img src="" class="layer" id="layer-pants" alt="Pants">
+                <img src="" class="layer" id="layer-armor" alt="Armor">
+                <img src="" class="layer" id="layer-helmet" alt="Helmet">
+                <img src="" class="layer" id="layer-weapon" alt="Weapon">
+                <img src="" class="layer" id="layer-shield" alt="Shield">
+            </div>
+        </div>
+
+        <!-- 右側：裝備切換面板 -->
+        <div class="controls-panel">
+            <h1>Avatar System</h1>
+            <p class="subtitle">Customize your character</p>
+            
+            <div class="equip-group">
+                <label>武器 (Weapon)</label>
+                <select id="select-weapon">
+                    <option value="">無裝備 (None)</option>
+                    <option value="level1">等級 1 (Level 1)</option>
+                    <option value="level2">等級 2 (Level 2)</option>
+                    <option value="level3">等級 3 (Level 3)</option>
+                    <option value="level4">等級 4 (Level 4)</option>
+                    <option value="level5">等級 5 (Level 5)</option>
+                    <option value="level6">等級 6 (Level 6)</option>
+                    <option value="level7">等級 7 (Level 7)</option>
+                </select>
+            </div>
+            
+            <div class="equip-group">
+                <label>頭盔 (Helmet)</label>
+                <select id="select-helmet">
+                    <option value="">無裝備 (None)</option>
+                    <option value="level1">等級 1 (Level 1)</option>
+                    <option value="level2">等級 2 (Level 2)</option>
+                    <option value="level3">等級 3 (Level 3)</option>
+                    <option value="level4">等級 4 (Level 4)</option>
+                    <option value="level5">等級 5 (Level 5)</option>
+                    <option value="level6">等級 6 (Level 6)</option>
+                    <option value="level7">等級 7 (Level 7)</option>
+                </select>
+            </div>
+            
+            <div class="equip-group">
+                <label>裝甲 (Armor)</label>
+                <select id="select-armor">
+                    <option value="">無裝備 (None)</option>
+                    <option value="level1">等級 1 (Level 1)</option>
+                    <option value="level2">等級 2 (Level 2)</option>
+                    <option value="level3">等級 3 (Level 3)</option>
+                    <option value="level4">等級 4 (Level 4)</option>
+                    <option value="level5">等級 5 (Level 5)</option>
+                    <option value="level6">等級 6 (Level 6)</option>
+                    <option value="level7">等級 7 (Level 7)</option>
+                </select>
+            </div>
+            
+            <div class="equip-group">
+                <label>褲子/靴子 (Pants & Boots)</label>
+                <select id="select-pants">
+                    <option value="">無裝備 (None)</option>
+                    <option value="level1">等級 1 (Level 1)</option>
+                    <option value="level2">等級 2 (Level 2)</option>
+                    <option value="level3">等級 3 (Level 3)</option>
+                    <option value="level4">等級 4 (Level 4)</option>
+                    <option value="level5">等級 5 (Level 5)</option>
+                    <option value="level6">等級 6 (Level 6)</option>
+                    <option value="level7">等級 7 (Level 7)</option>
+                </select>
+            </div>
+            
+            <div class="equip-group">
+                <label>盾牌 (Shield)</label>
+                <select id="select-shield">
+                    <option value="">無裝備 (None)</option>
+                    <option value="level1">等級 1 (Level 1)</option>
+                    <option value="level2">等級 2 (Level 2)</option>
+                    <option value="level3">等級 3 (Level 3)</option>
+                    <option value="level4">等級 4 (Level 4)</option>
+                    <option value="level5">等級 5 (Level 5)</option>
+                    <option value="level6">等級 6 (Level 6)</option>
+                    <option value="level7">等級 7 (Level 7)</option>
+                </select>
+            </div>
+            
+            <button id="equip-all-btn" class="btn primary">一鍵全套 1 級</button>
+            <button id="unequip-all-btn" class="btn secondary">脫下全部</button>
+
+            <hr style="border: 1px solid rgba(255,255,255,0.1); margin: 20px 0;">
+            <h3 style="font-size: 16px; color: #818cf8;">位置微調工具 (Adjustment)</h3>
+            <div class="equip-group">
+                <label>微調部位</label>
+                <select id="adj-part">
+                    <option value="weapon">武器 (Weapon)</option>
+                    <option value="helmet">頭盔 (Helmet)</option>
+                    <option value="armor">裝甲 (Armor)</option>
+                    <option value="pants">褲子/靴子 (Pants & Boots)</option>
+                    <option value="shield">盾牌 (Shield)</option>
+                </select>
+            </div>
+            <div class="equip-group">
+                <label>微調等級</label>
+                <select id="adj-level">
+                    <option value="level1">等級 1</option>
+                    <option value="level2">等級 2</option>
+                    <option value="level3">等級 3</option>
+                    <option value="level4">等級 4</option>
+                    <option value="level5">等級 5</option>
+                    <option value="level6">等級 6</option>
+                    <option value="level7">等級 7</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <div class="equip-group" style="flex:1">
+                    <label>X 軸</label>
+                    <input type="number" id="adj-x" value="0">
+                </div>
+                <div class="equip-group" style="flex:1">
+                    <label>Y 軸</label>
+                    <input type="number" id="adj-y" value="0">
+                </div>
+            </div>
+            <button id="copy-config-btn" class="btn primary" style="background:#10b981; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">複製修改後的 Config</button>
+        </div>
+    </div>
+    
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

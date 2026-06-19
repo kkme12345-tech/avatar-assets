@@ -1,0 +1,189 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #1a1c29 0%, #0d0f1a 100%);
+    color: #e2e8f0;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.container {
+    display: flex;
+    flex-direction: row;
+    width: 90%;
+    max-width: 1200px;
+    height: 80vh;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+}
+
+/* 左側：展示區 */
+.avatar-panel {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    background: radial-gradient(circle at center, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+}
+
+.avatar-container {
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    /* Height will be determined by #layer-base */
+}
+
+.layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* Width and height are set dynamically via JS */
+    transition: opacity 0.3s ease;
+    opacity: 0;
+}
+
+
+/* Z-Index 疊圖順序 */
+#layer-base {
+    position: relative; /* This is the trick: base image determines container height! */
+    width: 100%;
+    height: auto;
+    z-index: 10;
+    opacity: 1;
+}
+#layer-pants { z-index: 20; }
+#layer-armor { z-index: 30; }
+#layer-helmet { z-index: 40; }
+#layer-weapon { z-index: 50; }
+#layer-shield { z-index: 60; }
+
+
+/* 右側：控制面板 */
+.controls-panel {
+    width: 400px;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+}
+
+h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 5px;
+    background: linear-gradient(to right, #818cf8, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+    color: #94a3b8;
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+
+.equip-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.equip-group label {
+    font-size: 14px;
+    color: #cbd5e1;
+    font-weight: 600;
+}
+
+select, input[type="number"] {
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: #fff;
+    font-size: 15px;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+select {
+    cursor: pointer;
+    appearance: none;
+}
+
+select:hover, input[type="number"]:hover {
+    border-color: rgba(129, 140, 248, 0.5);
+    background: rgba(0, 0, 0, 0.3);
+}
+
+select:focus, input[type="number"]:focus {
+    border-color: #818cf8;
+    box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.2);
+}
+
+select option {
+    background: #1e293b;
+    color: #fff;
+}
+
+.btn {
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 10px;
+}
+
+.btn.primary {
+    background: #6366f1;
+    color: white;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+}
+
+.btn.primary:hover {
+    background: #4f46e5;
+    transform: translateY(-2px);
+}
+
+.btn.secondary {
+    background: rgba(255, 255, 255, 0.05);
+    color: #cbd5e1;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* RWD */
+@media (max-width: 900px) {
+    .container {
+        flex-direction: column;
+        height: 95vh;
+        overflow-y: auto;
+    }
+    .avatar-panel {
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 20px 0;
+    }
+    .controls-panel {
+        width: 100%;
+    }
+}

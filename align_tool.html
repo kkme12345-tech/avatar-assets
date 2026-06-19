@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>特徵點標記校正工具</title>
+    <style>
+        body { font-family: sans-serif; background: #222; color: #fff; text-align: center; margin: 0; padding: 20px; }
+        .container { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .canvas-container { position: relative; border: 2px solid #555; background: #333; overflow: hidden; cursor: crosshair; }
+        canvas { display: block; max-width: 100%; height: auto; }
+        .instructions { font-size: 18px; color: #ffeb3b; padding: 10px; background: rgba(0,0,0,0.5); border-radius: 8px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 4px; }
+        button:disabled { background: #888; cursor: not-allowed; }
+        .point-marker { position: absolute; width: 10px; height: 10px; background: red; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+        #result { margin-top: 20px; padding: 15px; background: #111; border: 1px solid #444; border-radius: 8px; text-align: left; white-space: pre-wrap; font-family: monospace; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>特徵點標記工具</h2>
+        <div class="instructions" id="instruction-text">請點擊 <b>基底素圖 (boy_base.png)</b> 的【左眼瞳孔】</div>
+        
+        <div class="canvas-container" id="canvas-wrapper">
+            <canvas id="canvas"></canvas>
+        </div>
+        
+        <div id="controls" style="display: none;">
+            <button id="copy-btn">複製校正數據 (Copy Data)</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const images = ['boy_base.png', '1級.PNG'];
+        const pointsToMark = [
+            '左眼 (Left Eye)', '右眼 (Right Eye)', 
+            '左手肘 (Left Elbow)', '右手肘 (Right Elbow)',
+            '左手掌中心 (Left Hand)', '右手掌中心 (Right Hand)',
+            '左腳中心 (Left Foot)', '右腳中心 (Right Foot)'
+        ];
+        
+        let currentImageIndex = 0;
+        let currentPointIndex = 0;
+        
+        const markedData = {
+            'boy_base.png': [],
+            '1級.PNG': []
+        };
+        
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const wrapper = document.getElementById('canvas-wrapper');
+        const instructionEl = document.getElementById('instruction-text');
+        
+        let currentImg = new Image();
+        
+        function loadImage() {
+            if (currentImageIndex >= images.length) {
+                calculateAndShowResult();
+                return;
+            }
+            
+            currentImg.src = images[currentImageIndex];
+            currentImg.onload = () => {
+                // To make it fit on screen, we scale it down visually, but we need raw coordinates
+                // We'll set canvas internal size to actual image size, and use CSS for display
+                // Wait, if we use CSS max-width, the mouse click coordinates need to be mapped back!
+                canvas.width = currentImg.width;
+                canvas.height = currentImg.height;
+                wrapper.style.width = '800px'; // Visual limit
+                wrapper.style.height = (currentImg.height * (800 / currentImg.width)) + 'px';
+                
+                drawCanvas();
+                updateInstructions();
+            };
+        }
+        
+        function drawCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(currentImg, 0, 0);
+            
+            // Draw already marked points for current image
+            const pts = markedData[images[currentImageIndex]];
+            ctx.fillStyle = 'red';
+            pts.forEach(pt => {
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = 'white';
+                ctx.stroke();
+            });
+        }
+        
+        function updateInstructions() {
+            const imgName = images[currentImageIndex] === 'boy_base.png' ? '基底素圖 (boy_base.png)' : '裝備圖 (1級.PNG)';
+            const ptName = pointsToMark[currentPointIndex];
+            instructionEl.innerHTML = `請點擊 <b>${imgName}</b> 的【${ptName}】`;
+        }
+        
+        canvas.addEventListener('mousedown', (e) => {
+            if (currentImageIndex >= images.length) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            // Calculate scale between visual CSS size and actual canvas size
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            const x = Math.round((e.clientX - rect.left) * scaleX);
+            const y = Math.round((e.clientY - rect.top) * scaleY);
+            
+            markedData[images[currentImageIndex]].push({ x, y });
+            drawCanvas();
+            
+            currentPointIndex++;
+            if (currentPointIndex >= pointsToMark.length) {
+                currentPointIndex = 0;
+                currentImageIndex++;
+                loadImage(); // Load next image
+            } else {
+                updateInstructions();
+            }
+        });
+        
+        function calculateAndShowResult() {
+            wrapper.style.display = 'none';
+            instructionEl.innerHTML = '✅ 標記完成！請複製下方數據貼給 AI。';
+            
+            const basePts = markedData['boy_base.png'];
+            const eqPts = markedData['1級.PNG'];
+            
+            // Calculate Eye Distance (for Scale)
+            const baseEyeDist = Math.hypot(basePts[1].x - basePts[0].x, basePts[1].y - basePts[0].y);
+            const eqEyeDist = Math.hypot(eqPts[1].x - eqPts[0].x, eqPts[1].y - eqPts[0].y);
+            
+            const baseElbowDist = Math.hypot(basePts[3].x - basePts[2].x, basePts[3].y - basePts[2].y);
+            const eqElbowDist = Math.hypot(eqPts[3].x - eqPts[2].x, eqPts[3].y - eqPts[2].y);
+            
+            const scaleEye = eqEyeDist / baseEyeDist;
+            const scaleElbow = eqElbowDist / baseElbowDist;
+            
+            // Let's take the eye scale as primary, or average them if the user wants non-uniform
+            // Usually we do uniform scale to avoid distorting the base body
+            const scale = (scaleEye + scaleElbow) / 2;
+            
+            // Calculate Offset using Left Eye as reference point
+            // If base body is scaled by 'scale', its new left eye X is basePts[0].x * scale
+            // To match eqPts[0].x, the offset must be:
+            const offsetX = eqPts[0].x - (basePts[0].x * scale);
+            const offsetY = eqPts[0].y - (basePts[0].y * scale);
+            
+            const finalData = {
+                scaleEye: scaleEye.toFixed(4),
+                scaleElbow: scaleElbow.toFixed(4),
+                suggestedScale: scale.toFixed(4),
+                offsetX: Math.round(offsetX),
+                offsetY: Math.round(offsetY),
+                rawBasePoints: basePts,
+                rawEquipPoints: eqPts
+            };
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerText = JSON.stringify(finalData, null, 2);
+            
+            document.getElementById('controls').style.display = 'block';
+            
+            document.getElementById('copy-btn').addEventListener('click', () => {
+                navigator.clipboard.writeText(JSON.stringify(finalData, null, 2));
+                alert('已複製！請將資料貼給 AI');
+            });
+        }
+        
+        // Start
+        loadImage();
+    </script>
+</body>
+</html>

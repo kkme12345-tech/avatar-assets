@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>互動式紙娃娃摳圖工具</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1e1e1e; color: #eee; margin: 0; padding: 20px; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .header h1 { margin: 0; font-size: 24px; color: #4CAF50; }
+        .container { display: flex; flex: 1; gap: 20px; min-height: 0; }
+        .sidebar { width: 340px; background: #2d2d2d; padding: 20px; border-radius: 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .main-content { flex: 1; background: #2d2d2d; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+        .canvas-container { position: relative; overflow: auto; max-width: 100%; max-height: 100%; border: 1px solid #555; background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/ENF5gBgM+P/vP0wz0MAoFAYDCQCMmQv8W2/D1QAAAABJRU5ErkJggg==') repeat; }
+        canvas { display: block; cursor: crosshair; }
+        
+        .control-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 14px; font-weight: bold; color: #aaa; }
+        input[type="file"], input[type="number"], input[type="range"], select { width: 100%; padding: 8px; background: #1e1e1e; border: 1px solid #444; color: #fff; border-radius: 4px; box-sizing: border-box; }
+        .row { display: flex; gap: 10px; }
+        .row > div { flex: 1; }
+        
+        button { padding: 10px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        button:hover { background: #45a049; }
+        button:disabled { background: #555; color: #888; cursor: not-allowed; }
+        button.secondary { background: #2196F3; }
+        button.secondary:hover { background: #1976D2; }
+        button.danger { background: #f44336; }
+        button.danger:hover { background: #d32f2f; }
+
+        .preview-box { border: 1px solid #555; background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/ENF5gBgM+P/vP0wz0MAoFAYDCQCMmQv8W2/D1QAAAABJRU5ErkJggg==') repeat; min-height: 150px; display: flex; align-items: center; justify-content: center; margin-top: 10px; border-radius: 4px; overflow: hidden; }
+        #previewCanvas { max-width: 100%; max-height: 200px; }
+        
+        .saved-parts { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+        .saved-part-item { display: flex; justify-content: space-between; align-items: center; background: #1e1e1e; padding: 10px; border-radius: 4px; border: 1px solid #444; }
+        .saved-part-item img { max-width: 50px; max-height: 50px; background: #333; object-fit: contain; }
+        
+        #overlay { position: absolute; pointer-events: none; border: 2px dashed #ffeb3b; background: rgba(255, 235, 59, 0.2); display: none; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>互動式紙娃娃摳圖工具</h1>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <label style="color: #ccc; font-size: 14px;">套裝名稱:</label>
+            <input type="text" id="inpLevelName" value="level1" style="width: 100px; padding: 5px;">
+            <button id="btnExportAll" disabled>匯出已儲存部位 (ZIP)</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 左側面板 -->
+        <div class="sidebar">
+            <div class="control-group">
+                <label>1. 載入基底素體 (Boy Base)</label>
+                <input type="file" id="fileBase" accept="image/png, image/jpeg">
+            </div>
+            <div class="control-group">
+                <label>2. 載入裝備圖 (Equipment)</label>
+                <input type="file" id="fileEquip" accept="image/png, image/jpeg">
+            </div>
+
+            <hr style="border-color: #444; width: 100%;">
+
+            <div class="control-group">
+                <label>對齊參數 (預設為 extract.js 參數)</label>
+                <div class="row">
+                    <div><label>Scale</label><input type="number" id="inpScale" value="0.6811" step="0.0001"></div>
+                </div>
+                <div class="row">
+                    <div><label>Offset X</label><input type="number" id="inpOffsetX" value="-188"></div>
+                    <div><label>Offset Y</label><input type="number" id="inpOffsetY" value="-6"></div>
+                </div>
+            </div>
+
+            <hr style="border-color: #444; width: 100%;">
+
+            <div class="control-group">
+                <label>3. 框選工具 (Tool)</label>
+                <div class="row">
+                    <label style="color:#eee; font-weight:normal; font-size:13px; cursor:pointer;"><input type="radio" name="toolMode" value="rect" checked> 方形框選 (拖曳)</label>
+                    <label style="color:#eee; font-weight:normal; font-size:13px; cursor:pointer;"><input type="radio" name="toolMode" value="poly"> 多邊形節點 (點擊)</label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>4. 選擇目前框選部位</label>
+                <select id="selPart">
+                    <option value="helmet">頭盔 (Helmet)</option>
+                    <option value="weapon">武器 (Weapon)</option>
+                    <option value="shield">盾牌 (Shield)</option>
+                    <option value="armor">衣服 (Armor)</option>
+                    <option value="pants">褲子 (Pants)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>色素容差 (Tolerance): <span id="lblTol">50</span></label>
+                <input type="range" id="inpTol" min="0" max="255" value="50">
+                <small style="color:#888;">數值越小去背越精準；越大則會保留更多漸層。調整此值以改善邊緣雜點。</small>
+            </div>
+
+            <div class="control-group">
+                <label>去背預覽</label>
+                <div class="preview-box">
+                    <canvas id="previewCanvas"></canvas>
+                </div>
+            </div>
+
+            <button id="btnSavePart" class="secondary" disabled>儲存此部位設定</button>
+
+            <hr style="border-color: #444; width: 100%;">
+
+            <div class="control-group">
+                <label>已儲存的部位</label>
+                <div class="saved-parts" id="savedPartsList">
+                    <!-- 列表項目 -->
+                    <div style="color: #666; font-size: 12px; text-align: center;">尚未儲存任何部位</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主要畫布區 -->
+        <div class="main-content">
+            <h3 style="margin-top:0; color:#aaa; z-index: 10;" id="canvasInstruction">請先載入素體與裝備圖片</h3>
+            <div class="canvas-container" id="canvasWrapper" style="display:none;">
+                <canvas id="mainCanvas"></canvas>
+                <canvas id="overlayCanvas" style="position:absolute; top:0; left:0; pointer-events:none;"></canvas>
+                <div id="overlay"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const fileBase = document.getElementById('fileBase');
+        const fileEquip = document.getElementById('fileEquip');
+        const inpScale = document.getElementById('inpScale');
+        const inpOffsetX = document.getElementById('inpOffsetX');
+        const inpOffsetY = document.getElementById('inpOffsetY');
+        const selPart = document.getElementById('selPart');
+        const inpTol = document.getElementById('inpTol');
+        const lblTol = document.getElementById('lblTol');
+        const btnSavePart = document.getElementById('btnSavePart');
+        const btnExportAll = document.getElementById('btnExportAll');
+        
+        const canvasWrapper = document.getElementById('canvasWrapper');
+        const mainCanvas = document.getElementById('mainCanvas');
+        const ctxMain = mainCanvas.getContext('2d', { willReadFrequently: true });
+        const overlay = document.getElementById('overlay');
+        const overlayCanvas = document.getElementById('overlayCanvas');
+        const oCtx = overlayCanvas.getContext('2d');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const ctxPreview = previewCanvas.getContext('2d', { willReadFrequently: true });
+        const canvasInstruction = document.getElementById('canvasInstruction');
+        const savedPartsList = document.getElementById('savedPartsList');
+
+        // State
+        let toolMode = 'rect';
+        let polyPoints = [];
+        let polyClosed = false;
+
+        let imgBase = null;
+        let imgEquip = null;
+        let baseData = null; // ImageData
+        let equipData = null; // ImageData
+        let currentBBox = null; // {x, y, w, h}
+        let currentCroppedBounds = null; // Tightly cropped bounds {minX, minY, w, h}
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+
+        const savedPartsData = {}; // { partName: { imageBase64, bounds: {x,y,w,h} } }
+
+        // Event Listeners
+        fileBase.addEventListener('change', (e) => handleImageUpload(e, 'base'));
+        fileEquip.addEventListener('change', (e) => handleImageUpload(e, 'equip'));
+        inpTol.addEventListener('input', (e) => { lblTol.innerText = e.target.value; updatePreview(); });
+        [inpScale, inpOffsetX, inpOffsetY].forEach(el => el.addEventListener('change', () => { extractImageData(); updatePreview(); }));
+        selPart.addEventListener('change', () => { 
+            currentBBox = null; 
+            hideOverlay(); 
+            polyPoints = []; 
+            polyClosed = false;
+            oCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            clearPreview(); 
+            updateInstruction(); 
+        });
+
+        document.querySelectorAll('input[name="toolMode"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                toolMode = e.target.value;
+                polyPoints = [];
+                polyClosed = false;
+                currentBBox = null;
+                hideOverlay();
+                oCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                clearPreview();
+                updateInstruction();
+            });
+        });
+
+        mainCanvas.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+        
+        mainCanvas.addEventListener('contextmenu', (e) => {
+            if (toolMode === 'poly') {
+                e.preventDefault();
+                if (polyPoints.length >= 3 && !polyClosed) {
+                    polyClosed = true;
+                    drawOverlay();
+                    calculatePolyBBox();
+                    updatePreview();
+                }
+            }
+        });
+
+        btnSavePart.addEventListener('click', saveCurrentPart);
+        btnExportAll.addEventListener('click', exportAll);
+
+        function updateInstruction() {
+            if (imgBase && imgEquip) {
+                if (toolMode === 'rect') {
+                    canvasInstruction.innerText = '✅ 準備完成！請在圖上拖曳滑鼠，框選「' + selPart.options[selPart.selectedIndex].text + '」的邊界';
+                } else {
+                    canvasInstruction.innerText = '✅ 準備完成！請點擊滑鼠建立節點，最後點擊起點 (或按右鍵) 閉合多邊形';
+                }
+                canvasInstruction.style.color = '#4CAF50';
+            } else {
+                canvasInstruction.innerText = '請先載入素體與裝備圖片';
+                canvasInstruction.style.color = '#aaa';
+            }
+        }
+
+        function handleImageUpload(e, type) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            // Update UI label
+            const label = e.target.previousElementSibling;
+            if (!label.originalText) label.originalText = label.innerText;
+            label.innerText = label.originalText + ' (載入中...)';
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    label.innerText = label.originalText + ' ✅';
+                    label.style.color = '#4CAF50';
+                    
+                    if (type === 'base') imgBase = img;
+                    if (type === 'equip') {
+                        imgEquip = img;
+                        mainCanvas.width = img.width;
+                        mainCanvas.height = img.height;
+                        overlayCanvas.width = img.width;
+                        overlayCanvas.height = img.height;
+                        ctxMain.drawImage(img, 0, 0);
+                        canvasWrapper.style.display = 'inline-block';
+                    }
+                    if (imgBase && imgEquip) {
+                        extractImageData();
+                    }
+                    updateInstruction();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Cache image data for fast processing
+        function extractImageData() {
+            if (!imgBase || !imgEquip) return;
+            try {
+                // Get Equip Data
+                ctxMain.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+                ctxMain.drawImage(imgEquip, 0, 0);
+                equipData = ctxMain.getImageData(0, 0, mainCanvas.width, mainCanvas.height);
+
+                // Create a temporary canvas for Base Data to get raw pixels
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = imgBase.width;
+                tempCanvas.height = imgBase.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(imgBase, 0, 0);
+                baseData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            } catch (err) {
+                console.error("ImageData Extraction Error:", err);
+                alert("圖片解析失敗，請確認圖片格式是否正確。");
+            }
+        }
+
+        // Mouse Events for Bounding Box
+        function onMouseDown(e) {
+            if (!equipData || !baseData) {
+                if (e.target === mainCanvas || e.target === overlay) {
+                    alert("請先確認左側的「1. 載入基底素體」與「2. 載入裝備圖」皆已成功載入！");
+                }
+                return;
+            }
+            if (e.target !== mainCanvas && e.target !== overlay) return;
+            
+            const rect = mainCanvas.getBoundingClientRect();
+            const scaleX = mainCanvas.width / rect.width;
+            const scaleY = mainCanvas.height / rect.height;
+            const x = Math.round((e.clientX - rect.left) * scaleX);
+            const y = Math.round((e.clientY - rect.top) * scaleY);
+            
+            if (toolMode === 'rect') {
+                startX = x;
+                startY = y;
+                isDragging = true;
+                currentBBox = null;
+                overlay.style.display = 'block';
+                updateOverlayRect(startX, startY, 0, 0);
+            } else if (toolMode === 'poly') {
+                if (polyClosed) {
+                    polyPoints = [];
+                    polyClosed = false;
+                    currentBBox = null;
+                    clearPreview();
+                }
+                
+                if (polyPoints.length >= 3) {
+                    const dist = Math.hypot(x - polyPoints[0].x, y - polyPoints[0].y);
+                    if (dist < 10) {
+                        polyClosed = true;
+                        drawOverlay();
+                        calculatePolyBBox();
+                        updatePreview();
+                        return;
+                    }
+                }
+                polyPoints.push({x, y});
+                drawOverlay(x, y);
+            }
+            
+            e.preventDefault();
+        }
+
+        function onMouseMove(e) {
+            if (!equipData || !baseData) return;
+            const rect = mainCanvas.getBoundingClientRect();
+            const scaleX = mainCanvas.width / rect.width;
+            const scaleY = mainCanvas.height / rect.height;
+            const mouseX = Math.max(0, Math.min(mainCanvas.width, Math.round((e.clientX - rect.left) * scaleX)));
+            const mouseY = Math.max(0, Math.min(mainCanvas.height, Math.round((e.clientY - rect.top) * scaleY)));
+
+            if (toolMode === 'rect' && isDragging) {
+                const x = Math.min(startX, mouseX);
+                const y = Math.min(startY, mouseY);
+                const w = Math.abs(mouseX - startX);
+                const h = Math.abs(mouseY - startY);
+                updateOverlayRect(x, y, w, h);
+            } else if (toolMode === 'poly' && polyPoints.length > 0 && !polyClosed) {
+                drawOverlay(mouseX, mouseY);
+            }
+        }
+
+        function onMouseUp(e) {
+            if (toolMode === 'rect' && isDragging) {
+                isDragging = false;
+                
+                const rect = mainCanvas.getBoundingClientRect();
+                const scaleX = mainCanvas.width / rect.width;
+                const scaleY = mainCanvas.height / rect.height;
+
+                const mouseX = Math.max(0, Math.min(mainCanvas.width, Math.round((e.clientX - rect.left) * scaleX)));
+                const mouseY = Math.max(0, Math.min(mainCanvas.height, Math.round((e.clientY - rect.top) * scaleY)));
+                
+                const x = Math.min(startX, mouseX);
+                const y = Math.min(startY, mouseY);
+                const w = Math.abs(mouseX - startX);
+                const h = Math.abs(mouseY - startY);
+
+                if (w > 5 && h > 5) {
+                    currentBBox = { x, y, w, h };
+                    updatePreview();
+                } else {
+                    hideOverlay();
+                    clearPreview();
+                }
+            }
+        }
+
+        function updateOverlayRect(x, y, w, h) {
+            // Need to convert canvas coordinates back to CSS pixels
+            const rect = mainCanvas.getBoundingClientRect();
+            const scaleX = rect.width / mainCanvas.width;
+            const scaleY = rect.height / mainCanvas.height;
+
+            overlay.style.left = (x * scaleX) + 'px';
+            overlay.style.top = (y * scaleY) + 'px';
+            overlay.style.width = (w * scaleX) + 'px';
+            overlay.style.height = (h * scaleY) + 'px';
+        }
+
+        function drawOverlay(mouseX, mouseY) {
+            oCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            if (toolMode === 'poly' && polyPoints.length > 0) {
+                oCtx.beginPath();
+                oCtx.moveTo(polyPoints[0].x, polyPoints[0].y);
+                for (let i = 1; i < polyPoints.length; i++) {
+                    oCtx.lineTo(polyPoints[i].x, polyPoints[i].y);
+                }
+                if (polyClosed) {
+                    oCtx.lineTo(polyPoints[0].x, polyPoints[0].y);
+                    oCtx.fillStyle = 'rgba(255, 235, 59, 0.2)';
+                    oCtx.fill();
+                } else if (mouseX !== undefined && mouseY !== undefined) {
+                    oCtx.lineTo(mouseX, mouseY);
+                }
+                oCtx.strokeStyle = '#ffeb3b';
+                oCtx.lineWidth = 2;
+                oCtx.stroke();
+                
+                oCtx.fillStyle = 'red';
+                for (const p of polyPoints) {
+                    oCtx.beginPath();
+                    oCtx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                    oCtx.fill();
+                }
+            }
+        }
+
+        function hideOverlay() {
+            overlay.style.display = 'none';
+        }
+
+        function clearPreview() {
+            ctxPreview.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            btnSavePart.disabled = true;
+            currentCroppedBounds = null;
+        }
+
+        function calculatePolyBBox() {
+            if (polyPoints.length === 0) return;
+            let minX = mainCanvas.width, maxX = 0, minY = mainCanvas.height, maxY = 0;
+            for (const p of polyPoints) {
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.y > maxY) maxY = p.y;
+            }
+            currentBBox = {x: minX, y: minY, w: maxX - minX, h: maxY - minY};
+        }
+
+        function isPointInPolygon(point, vs) {
+            let x = point[0], y = point[1];
+            let inside = false;
+            for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+                let xi = vs[i].x, yi = vs[i].y;
+                let xj = vs[j].x, yj = vs[j].y;
+                let intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        // Core extraction logic (Background Subtraction)
+        function updatePreview() {
+            if (!currentBBox || !baseData || !equipData) return;
+
+            const scale = parseFloat(inpScale.value);
+            const offsetX = parseInt(inpOffsetX.value);
+            const offsetY = parseInt(inpOffsetY.value);
+            const tolerance = parseInt(inpTol.value);
+
+            const equipW = equipData.width;
+            const boyW = baseData.width;
+            const boyH = baseData.height;
+
+            let minX = equipW, maxX = 0, minY = equipData.height, maxY = 0;
+            const pixelsToKeep = [];
+
+            // Only iterate within the drawn bounding box
+            for (let y = currentBBox.y; y <= currentBBox.y + currentBBox.h; y++) {
+                if (y >= equipData.height) continue;
+                for (let x = currentBBox.x; x <= currentBBox.x + currentBBox.w; x++) {
+                    if (x >= equipW) continue;
+                    
+                    const eIdx = (equipW * y + x) * 4;
+                    const eA = equipData.data[eIdx + 3];
+
+                    // Ignore transparent pixels
+                    if (eA > 0) {
+                        if (toolMode === 'poly' && polyPoints.length > 0) {
+                            if (!isPointInPolygon([x, y], polyPoints)) {
+                                continue;
+                            }
+                        }
+
+                        const baseX = Math.round((x - offsetX) / scale);
+                        const baseY = Math.round((y - offsetY) / scale);
+                        
+                        let isEquipment = true;
+
+                        // Compare with base body if coordinates are within base body
+                        if (baseX >= 0 && baseX < boyW && baseY >= 0 && baseY < boyH) {
+                            const bIdx = (boyW * baseY + baseX) * 4;
+                            const bR = baseData.data[bIdx];
+                            const bG = baseData.data[bIdx+1];
+                            const bB = baseData.data[bIdx+2];
+                            const bA = baseData.data[bIdx+3];
+
+                            const eR = equipData.data[eIdx];
+                            const eG = equipData.data[eIdx+1];
+                            const eB = equipData.data[eIdx+2];
+
+                            if (bA > 0) { // If base body is not transparent here
+                                const diff = Math.abs(bR - eR) + Math.abs(bG - eG) + Math.abs(bB - eB);
+                                if (diff <= tolerance) {
+                                    isEquipment = false;
+                                }
+                            }
+                        }
+
+                        if (isEquipment) {
+                            pixelsToKeep.push({ x, y, r: equipData.data[eIdx], g: equipData.data[eIdx+1], b: equipData.data[eIdx+2], a: eA });
+                            if (x < minX) minX = x;
+                            if (x > maxX) maxX = x;
+                            if (y < minY) minY = y;
+                            if (y > maxY) maxY = y;
+                        }
+                    }
+                }
+            }
+
+            if (pixelsToKeep.length === 0) {
+                clearPreview();
+                return;
+            }
+
+            // Create a tight crop based on the actual detected pixels
+            const cropW = maxX - minX + 1;
+            const cropH = maxY - minY + 1;
+            
+            previewCanvas.width = cropW;
+            previewCanvas.height = cropH;
+            ctxPreview.clearRect(0, 0, cropW, cropH);
+
+            const outImgData = ctxPreview.createImageData(cropW, cropH);
+            for (const p of pixelsToKeep) {
+                const outX = p.x - minX;
+                const outY = p.y - minY;
+                const idx = (cropW * outY + outX) * 4;
+                outImgData.data[idx] = p.r;
+                outImgData.data[idx+1] = p.g;
+                outImgData.data[idx+2] = p.b;
+                outImgData.data[idx+3] = p.a;
+            }
+            ctxPreview.putImageData(outImgData, 0, 0);
+
+            currentCroppedBounds = { x: minX, y: minY, w: cropW, h: cropH };
+            btnSavePart.disabled = false;
+        }
+
+        function saveCurrentPart() {
+            if (!currentCroppedBounds) return;
+            const partName = selPart.value;
+            
+            const dataURL = previewCanvas.toDataURL("image/png");
+
+            savedPartsData[partName] = {
+                dataURL: dataURL,
+                bounds: currentCroppedBounds
+            };
+
+            renderSavedParts();
+            btnExportAll.disabled = Object.keys(savedPartsData).length === 0;
+            
+            if (selPart.selectedIndex < selPart.options.length - 1) {
+                selPart.selectedIndex++;
+                currentBBox = null;
+                hideOverlay();
+                clearPreview();
+                updateInstruction();
+            }
+        }
+
+        function renderSavedParts() {
+            if (Object.keys(savedPartsData).length === 0) {
+                savedPartsList.innerHTML = '<div style="color: #666; font-size: 12px; text-align: center;">尚未儲存任何部位</div>';
+                return;
+            }
+
+            savedPartsList.innerHTML = '';
+            for (const [key, data] of Object.entries(savedPartsData)) {
+                // Find matching label text
+                const option = Array.from(selPart.options).find(opt => opt.value === key);
+                const labelText = option ? option.text : key;
+
+                const div = document.createElement('div');
+                div.className = 'saved-part-item';
+                div.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <img src="${data.dataURL}" alt="${key}">
+                        <div style="display: flex; flex-direction: column;">
+                            <span style="font-weight: bold;">${labelText}</span>
+                            <span style="font-size: 11px; color: #888;">${data.bounds.w}x${data.bounds.h}</span>
+                        </div>
+                    </div>
+                    <button class="danger" style="padding: 5px 10px; font-size:12px;" onclick="deletePart('${key}')">刪除</button>
+                `;
+                savedPartsList.appendChild(div);
+            }
+        }
+
+        window.deletePart = function(key) {
+            delete savedPartsData[key];
+            renderSavedParts();
+            btnExportAll.disabled = Object.keys(savedPartsData).length === 0;
+        }
+
+        async function exportAll() {
+            if (Object.keys(savedPartsData).length === 0) return;
+            btnExportAll.disabled = true;
+            btnExportAll.innerText = '處理中...';
+
+            try {
+                const zip = new JSZip();
+                
+                const levelName = document.getElementById('inpLevelName').value.trim() || 'level1';
+                
+                const config = {
+                    boy: {
+                        base: { x: 0, y: 0, w: equipData.width, h: equipData.height }
+                    }
+                };
+                config.boy[levelName] = {};
+
+                const assetsFolder = zip.folder("assets").folder("boy");
+
+                for (const [partName, data] of Object.entries(savedPartsData)) {
+                    const base64Data = data.dataURL.split(',')[1];
+                    assetsFolder.folder(partName).file(`${levelName}.png`, base64Data, {base64: true});
+                    config.boy[levelName][partName] = data.bounds;
+                }
+
+                // Generate base.png using same logic as extract.js
+                const alignedCanvas = document.createElement('canvas');
+                alignedCanvas.width = equipData.width;
+                alignedCanvas.height = equipData.height;
+                const actx = alignedCanvas.getContext('2d');
+                
+                const scale = parseFloat(inpScale.value);
+                const offsetX = parseInt(inpOffsetX.value);
+                const offsetY = parseInt(inpOffsetY.value);
+                
+                // Draw base image mapped into equipment canvas space
+                for (let y = 0; y < equipData.height; y++) {
+                    for (let x = 0; x < equipData.width; x++) {
+                        const baseX = Math.round((x - offsetX) / scale);
+                        const baseY = Math.round((y - offsetY) / scale);
+                        
+                        if (baseX >= 0 && baseX < baseData.width && baseY >= 0 && baseY < baseData.height) {
+                            const srcIdx = (baseData.width * baseY + baseX) * 4;
+                            if (baseData.data[srcIdx + 3] > 0) {
+                                actx.fillStyle = `rgba(${baseData.data[srcIdx]}, ${baseData.data[srcIdx+1]}, ${baseData.data[srcIdx+2]}, ${baseData.data[srcIdx+3]/255})`;
+                                actx.fillRect(x, y, 1, 1);
+                            }
+                        }
+                    }
+                }
+                
+                const baseBase64 = alignedCanvas.toDataURL("image/png").split(',')[1];
+                assetsFolder.file("base.png", baseBase64, {base64: true});
+
+                // Export as config.txt instead of config.js to bypass Windows Defender blocking JS files in downloaded ZIPs
+                const configContent = `const APP_CONFIG = ${JSON.stringify(config, null, 2)};`;
+                zip.file("config.txt", configContent);
+
+                const blob = await zip.generateAsync({type:"blob"});
+                
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = "paperdoll_assets.zip";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                btnExportAll.innerText = '匯出完成！';
+                setTimeout(() => {
+                    btnExportAll.innerText = '匯出所有已儲存部位 (ZIP)';
+                    btnExportAll.disabled = false;
+                }, 2000);
+            } catch (err) {
+                console.error(err);
+                alert('匯出失敗: ' + err.message);
+                btnExportAll.innerText = '匯出所有已儲存部位 (ZIP)';
+                btnExportAll.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
